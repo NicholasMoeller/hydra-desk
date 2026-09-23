@@ -39,6 +39,8 @@
   <script type="module">
     const REPO = "NicholasMoeller/Grok-Bot-Options-Trading";
     const KEY = "hydraToken";
+    const REFS = ["main", "cursor/iphone-desk-check-063e"];
+    let notesRef = "main";
     const FILES = [
       "iphone/www/markdown.js",
       "iphone/www/gates.js",
@@ -52,23 +54,27 @@
     }
 
     async function gh(path, token) {
-      const url = "https://api.github.com/repos/" + REPO + "/contents/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=main";
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: {
-          Authorization: "Bearer " + token,
-          Accept: "application/vnd.github.raw",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      });
-      if (res.status === 401 || res.status === 403) {
-        const err = new Error("key");
-        err.code = "key";
-        throw err;
+      for (const ref of REFS) {
+        const url = "https://api.github.com/repos/" + REPO + "/contents/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(ref);
+        const res = await fetch(url, {
+          cache: "no-store",
+          headers: {
+            Authorization: "Bearer " + token,
+            Accept: "application/vnd.github.raw",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        });
+        if (res.status === 404) continue;
+        if (res.status === 401 || res.status === 403) {
+          const err = new Error("key");
+          err.code = "key";
+          throw err;
+        }
+        if (!res.ok) throw new Error("The notes could not be opened (" + res.status + ").");
+        notesRef = ref;
+        return res.text();
       }
-      if (res.status === 404) throw new Error("The desk is not on the main folder yet. Open this page again after that update is saved.");
-      if (!res.ok) throw new Error("The notes could not be opened (" + res.status + ").");
-      return res.text();
+      throw new Error("The desk is not on the main folder yet. Open this page again after that update is saved.");
     }
 
     function blob(source) {
@@ -89,6 +95,7 @@
       };
       let app = files["iphone/www/app.js"];
       for (const [spec, url] of Object.entries(map)) app = app.split('from "' + spec + '"').join('from "' + url + '"');
+      localStorage.setItem("hydraRef", notesRef);
       document.getElementById("setup").hidden = true;
       document.getElementById("desk").hidden = false;
       await import(blob(app));
